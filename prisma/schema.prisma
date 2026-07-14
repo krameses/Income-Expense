@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  type        String
+  date        DateTime
+  description String
+  amount      Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  details     String?
+}
+
+model MusicNote {
+  id        Int      @id @default(autoincrement())
+  songName  String
+  notes     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  scale     String?
+}
+
+model BadmintonMember {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model BadmintonPeriod {
+  id             Int                     @id @default(autoincrement())
+  month          String                  @unique
+  openingBalance Float                   @default(0)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  contributions  BadmintonContribution[]
+  expenses       BadmintonExpense[]
+}
+
+model BadmintonContribution {
+  id         Int             @id @default(autoincrement())
+  periodId   Int
+  memberName String
+  amount     Float
+  createdAt  DateTime        @default(now())
+  period     BadmintonPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+}
+
+model BadmintonExpense {
+  id          Int             @id @default(autoincrement())
+  periodId    Int
+  category    String
+  description String
+  paidBy      String
+  week        Int
+  amount      Float
+  createdAt   DateTime        @default(now())
+  period      BadmintonPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+}
+
+model Loan {
+  id           Int           @id @default(autoincrement())
+  name         String
+  lender       String?
+  loanAmount   Float
+  emiAmount    Float?
+  interestRate Float?
+  startDate    DateTime
+  endDate      DateTime?
+  notes        String?
+  isArchived   Boolean       @default(false)
+  archivedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  payments     LoanPayment[]
+}
+
+model LoanPayment {
+  id                 Int      @id @default(autoincrement())
+  loanId             Int
+  date               DateTime
+  amount             Float
+  outstandingBalance Float?
+  status             String   @default("paid")
+  notes              String?
+  createdAt          DateTime @default(now())
+  loan               Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+}
+
+model Investment {
+  id           Int               @id @default(autoincrement())
+  name         String
+  type         String
+  targetAmount Float?
+  isActive     Boolean           @default(true)
+  notes        String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  entries      InvestmentEntry[]
+}
+
+model InvestmentEntry {
+  id           Int        @id @default(autoincrement())
+  investmentId Int
+  date         DateTime
+  amount       Float
+  notes        String?
+  createdAt    DateTime   @default(now())
+  investment   Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  name        String
+  date        DateTime
+  category    String   @default("other")
+  isRecurring Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Student {
+  id            Int            @id @default(autoincrement())
+  name          String
+  notes         String?
+  createdAt     DateTime       @default(now())
+  academicYears AcademicYear[]
+}
+
+model AcademicYear {
+  id        Int        @id @default(autoincrement())
+  studentId Int
+  year      String
+  class     String?
+  school    String?
+  rollNo    String?
+  notes     String?
+  createdAt DateTime   @default(now())
+  student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fees      FeeEntry[]
+}
+
+model FeeEntry {
+  id             Int          @id @default(autoincrement())
+  academicYearId Int
+  description    String
+  amount         Float
+  status         String       @default("pending")
+  paidDate       DateTime?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+}
+
+model Credential {
+  id        Int      @id @default(autoincrement())
+  appName   String
+  category  String   @default("other")
+  username  String?
+  email     String?
+  password  String?
+  url       String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Record {
+  id         Int          @id @default(autoincrement())
+  title      String
+  category   String       @default("other")
+  provider   String?
+  accountNo  String?
+  amount      Float?
+  advance     Float?
+  maintenance Float?
+  dueDate     DateTime?
+  expiryDate  DateTime?
+  notes       String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  files      RecordFile[]
+}
+
+model RecordFile {
+  id        Int      @id @default(autoincrement())
+  recordId  Int
+  fileName  String
+  origName  String
+  mimeType  String
+  size      Int
+  createdAt DateTime @default(now())
+  record    Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+}
+
+model FluteBatch {
+  id          Int          @id @default(autoincrement())
+  feeAmount   Float
+  feePaidDate DateTime?
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  classes     FluteClass[]
+}
+
+model FluteClass {
+  id          Int        @id @default(autoincrement())
+  batchId     Int
+  classNumber Int
+  date        DateTime?
+  notes       String?
+  createdAt   DateTime   @default(now())
+  batch       FluteBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+}
