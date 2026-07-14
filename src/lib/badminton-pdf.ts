@@ -81,7 +81,7 @@ export function generateBadmintonPDF(period: Period, allMemberNames: string[]) {
   const TM  = 12;          // top margin
   const TH  = 8;           // title row height
   const RH  = 6.5;         // data / category row height
-  const TWC = 40;          // "Towards" column width
+  const TWC = 46;          // "Towards" column width
   const WKC = 18;          // each week column width
   const TBW = TWC + weeks.length * WKC; // total expense table width
 
@@ -89,6 +89,13 @@ export function generateBadmintonPDF(period: Period, allMemberNames: string[]) {
   const MBR_W = 22;        // per-member column width
   const CONT_W = allMemberNames.length * MBR_W;
   const CONT_X = PAGE_W - 10 - CONT_W; // flush right with 10mm margin
+
+  // Totals (used for the expense-table total row and the balance summary)
+  const totalContrib  = period.contributions.reduce((s, c) => s + c.amount, 0);
+  const totalExpenses = period.expenses.reduce((s, e) => s + e.amount, 0);
+  const openingBal    = period.openingBalance;
+  const totalFund      = openingBal + totalContrib;
+  const closingBal     = totalFund   - totalExpenses;
 
   // ── Helper: draw a filled + stroked rectangle ──────────────────────────────
   function cell(
@@ -166,6 +173,13 @@ export function generateBadmintonPDF(period: Period, allMemberNames: string[]) {
     }
   }
 
+  // Total row
+  cell(LM, ey, TWC, RH, CAT_BG);
+  cellText("Total", LM, ey, TWC, RH, [0, 0, 0], true, 9, "left");
+  cell(LM + TWC, ey, TBW - TWC, RH, [255, 255, 255]);
+  cellText(fmtNum(totalExpenses), LM + TWC, ey, TBW - TWC, RH, [0, 0, 0], true, 9, "right");
+  ey += RH;
+
   // ════════════════════════════════════════════════════════════════════════════
   // RIGHT — Contribution table
   // ════════════════════════════════════════════════════════════════════════════
@@ -198,11 +212,6 @@ export function generateBadmintonPDF(period: Period, allMemberNames: string[]) {
   // ════════════════════════════════════════════════════════════════════════════
   // RIGHT — Balance summary (below expense table, right-aligned with contrib)
   // ════════════════════════════════════════════════════════════════════════════
-  const totalContrib  = period.contributions.reduce((s, c) => s + c.amount, 0);
-  const totalExpenses = period.expenses.reduce((s, e) => s + e.amount, 0);
-  const openingBal    = period.openingBalance;
-  const totalFund     = openingBal + totalContrib;
-  const closingBal    = totalFund - totalExpenses;
 
   // Start balance block below expense table + gap
   let by = ey + 8;
