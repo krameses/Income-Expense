@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getPreviousClosingBalance, resyncFollowingPeriods } from "@/lib/badminton-balance";
 
 export async function GET() {
   const periods = await prisma.badmintonPeriod.findMany({
@@ -17,12 +18,14 @@ export async function POST(request: NextRequest) {
   if (!month) {
     return NextResponse.json({ error: "Month required" }, { status: 400 });
   }
+  const prevClosing = await getPreviousClosingBalance(month);
   const period = await prisma.badmintonPeriod.create({
     data: {
       month,
-      openingBalance: Number(openingBalance) || 0,
+      openingBalance: prevClosing ?? (Number(openingBalance) || 0),
     },
     include: { expenses: true, contributions: true },
   });
+  await resyncFollowingPeriods(month);
   return NextResponse.json(period, { status: 201 });
 }

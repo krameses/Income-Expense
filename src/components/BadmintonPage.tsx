@@ -112,7 +112,20 @@ export default function BadmintonPage() {
     loadData();
   }, []);
 
+  const refreshPeriods = useCallback(async () => {
+    const res = await fetch("/api/badminton/periods");
+    const data: Period[] = await res.json();
+    setPeriods(data);
+  }, []);
+
   const period = periods.find((p) => p.id === selectedPeriodId) ?? null;
+
+  const periodClosingBalance = (p: Period) =>
+    p.openingBalance + p.contributions.reduce((s, c) => s + c.amount, 0) - p.expenses.reduce((s, e) => s + e.amount, 0);
+
+  const previousPeriodForNew = newPeriodMonth
+    ? periods.filter((p) => p.month < newPeriodMonth).sort((a, b) => (a.month < b.month ? 1 : -1))[0] ?? null
+    : null;
 
   const totalContributions = period?.contributions.reduce((s, c) => s + c.amount, 0) ?? 0;
   const totalExpenses = period?.expenses.reduce((s, e) => s + e.amount, 0) ?? 0;
@@ -128,7 +141,7 @@ export default function BadmintonPage() {
       body: JSON.stringify({ month: newPeriodMonth, openingBalance: Number(newPeriodOpening) || 0 }),
     });
     const created: Period = await res.json();
-    setPeriods((prev) => [created, ...prev]);
+    await refreshPeriods();
     setSelectedPeriodId(created.id);
     setShowNewPeriod(false);
     setNewPeriodMonth("");
@@ -138,19 +151,18 @@ export default function BadmintonPage() {
   async function deletePeriod() {
     if (!period || !confirm(`Delete ${formatMonth(period.month)}? This removes all expenses and contributions.`)) return;
     await fetch(`/api/badminton/periods/${period.id}`, { method: "DELETE" });
-    setPeriods((prev) => prev.filter((p) => p.id !== period.id));
     setSelectedPeriodId(null);
+    await refreshPeriods();
   }
 
   async function saveOpeningBalance() {
     if (!period) return;
-    const res = await fetch(`/api/badminton/periods/${period.id}`, {
+    await fetch(`/api/badminton/periods/${period.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ openingBalance: Number(openingDraft) }),
     });
-    const updated: Period = await res.json();
-    setPeriods((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    await refreshPeriods();
     setEditingOpening(false);
   }
 
@@ -170,21 +182,18 @@ export default function BadmintonPage() {
     if (!period || !expenseForm.paidBy || !expenseForm.amount) return;
     const body = { periodId: period.id, category: expenseForm.category, description: expenseForm.description, paidBy: expenseForm.paidBy, week: expenseForm.week, amount: Number(expenseForm.amount) };
     if (editingExpense) {
-      const res = await fetch(`/api/badminton/expenses/${editingExpense.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const updated: Expense = await res.json();
-      setPeriods((prev) => prev.map((p) => p.id === period.id ? { ...p, expenses: p.expenses.map((e) => (e.id === updated.id ? updated : e)) } : p));
+      await fetch(`/api/badminton/expenses/${editingExpense.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     } else {
-      const res = await fetch("/api/badminton/expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const created: Expense = await res.json();
-      setPeriods((prev) => prev.map((p) => (p.id === period.id ? { ...p, expenses: [...p.expenses, created] } : p)));
+      await fetch("/api/badminton/expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     }
+    await refreshPeriods();
     setShowExpenseModal(false);
   }
 
   async function deleteExpense(id: number) {
     if (!period) return;
     await fetch(`/api/badminton/expenses/${id}`, { method: "DELETE" });
-    setPeriods((prev) => prev.map((p) => p.id === period.id ? { ...p, expenses: p.expenses.filter((e) => e.id !== id) } : p));
+    await refreshPeriods();
   }
 
   function openAddContrib() {
@@ -203,21 +212,18 @@ export default function BadmintonPage() {
     if (!period || !contribForm.memberName || !contribForm.amount) return;
     const body = { periodId: period.id, memberName: contribForm.memberName, amount: Number(contribForm.amount) };
     if (editingContrib) {
-      const res = await fetch(`/api/badminton/contributions/${editingContrib.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const updated: Contribution = await res.json();
-      setPeriods((prev) => prev.map((p) => p.id === period.id ? { ...p, contributions: p.contributions.map((c) => (c.id === updated.id ? updated : c)) } : p));
+      await fetch(`/api/badminton/contributions/${editingContrib.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     } else {
-      const res = await fetch("/api/badminton/contributions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const created: Contribution = await res.json();
-      setPeriods((prev) => prev.map((p) => (p.id === period.id ? { ...p, contributions: [...p.contributions, created] } : p)));
+      await fetch("/api/badminton/contributions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     }
+    await refreshPeriods();
     setShowContribModal(false);
   }
 
   async function deleteContrib(id: number) {
     if (!period) return;
     await fetch(`/api/badminton/contributions/${id}`, { method: "DELETE" });
-    setPeriods((prev) => prev.map((p) => p.id === period.id ? { ...p, contributions: p.contributions.filter((c) => c.id !== id) } : p));
+    await refreshPeriods();
   }
 
   async function addMember() {
@@ -456,9 +462,8 @@ export default function BadmintonPage() {
                           disabled={already}
                           onClick={async () => {
                             if (already) return;
-                            const res = await fetch("/api/badminton/contributions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ periodId: period.id, memberName: m.name, amount: 1500 }) });
-                            const created: Contribution = await res.json();
-                            setPeriods((prev) => prev.map((p) => p.id === period.id ? { ...p, contributions: [...p.contributions, created] } : p));
+                            await fetch("/api/badminton/contributions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ periodId: period.id, memberName: m.name, amount: 1500 }) });
+                            await refreshPeriods();
                           }}
                           className={`px-2 py-1 text-xs rounded-md border ${
                             already
@@ -520,10 +525,16 @@ export default function BadmintonPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Month</label>
               <input type="month" value={newPeriodMonth} onChange={(e) => setNewPeriodMonth(e.target.value)} className={inputCls} />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Opening Balance (₹)</label>
-              <input type="number" value={newPeriodOpening} onChange={(e) => setNewPeriodOpening(e.target.value)} placeholder="0" className={inputCls} />
-            </div>
+            {previousPeriodForNew ? (
+              <div className="text-xs text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2">
+                Opening balance will carry forward automatically from {formatMonth(previousPeriodForNew.month)}&apos;s closing balance: <strong>{fmt(periodClosingBalance(previousPeriodForNew))}</strong>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Opening Balance (₹)</label>
+                <input type="number" value={newPeriodOpening} onChange={(e) => setNewPeriodOpening(e.target.value)} placeholder="0" className={inputCls} />
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowNewPeriod(false)} className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
               <button onClick={createPeriod} disabled={!newPeriodMonth} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">Create</button>

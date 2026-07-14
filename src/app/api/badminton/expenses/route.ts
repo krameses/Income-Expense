@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resyncFollowingPeriods } from "@/lib/badminton-balance";
 
 export async function POST(request: NextRequest) {
   const { periodId, category, description, paidBy, week, amount } = await request.json();
@@ -15,6 +16,8 @@ export async function POST(request: NextRequest) {
       week: Number(week),
       amount: Number(amount),
     },
+    include: { period: true },
   });
+  await resyncFollowingPeriods(expense.period.month);
   return NextResponse.json(expense, { status: 201 });
 }

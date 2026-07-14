@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resyncFollowingPeriods } from "@/lib/badminton-balance";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,12 +14,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       ...(week !== undefined && { week: Number(week) }),
       ...(amount !== undefined && { amount: Number(amount) }),
     },
+    include: { period: true },
   });
+  await resyncFollowingPeriods(expense.period.month);
   return NextResponse.json(expense);
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await prisma.badmintonExpense.delete({ where: { id: Number(id) } });
+  const expense = await prisma.badmintonExpense.delete({
+    where: { id: Number(id) },
+    include: { period: true },
+  });
+  await resyncFollowingPeriods(expense.period.month);
   return NextResponse.json({ ok: true });
 }
